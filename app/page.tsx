@@ -24,7 +24,8 @@ export default function MapleApp() {
       })),
       materials: (materials || []).map(m => ({
         name: m.name,
-        imageUrl: m.image_url
+        imageUrl: m.image_url,
+        price: m.price // 이 부분을 추가해야 합니다. DB 컬럼명이 다르면 그에 맞춰 수정하세요.
       }))
     });
   };

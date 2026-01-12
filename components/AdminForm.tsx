@@ -1,6 +1,6 @@
 // src/components/AdminForm.tsx
 import React, { useState, useEffect } from 'react';
-import { CraftItem, Ingredient } from '@/utils/mapleUtils';
+import { CraftItem, Ingredient, supabase } from '@/utils/mapleUtils';
 
 interface Props {
   onSave: (item: CraftItem) => void;
@@ -17,8 +17,8 @@ export default function AdminForm({ onSave, onConfirmEdit, onCancelEdit, editing
     outputQuantity: 1,
     ingredients: [],
   });
+  const [isUploading, setIsUploading] = useState(false);
 
-  // 수정 버튼을 눌렀을 때 폼에 데이터 채우기
   useEffect(() => {
     if (editingItem) {
       setItem({ ...editingItem });
@@ -27,6 +27,52 @@ export default function AdminForm({ onSave, onConfirmEdit, onCancelEdit, editing
     }
   }, [editingItem]);
 
+  // 공통 이미지 업로드 로직
+  const uploadImage = async (file: File) => {
+    try {
+      setIsUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `uploads/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('maple-storage') // 미리 생성한 버킷 이름
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('maple-storage')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (error) {
+      alert('이미지 업로드에 실패했습니다.');
+      console.error(error);
+      return null;
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleMainImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const url = await uploadImage(e.target.files[0]);
+      if (url) setItem({ ...item, imageUrl: url });
+    }
+  };
+
+  const handleIngredientImageChange = async (idx: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      const url = await uploadImage(e.target.files[0]);
+      if (url) {
+        const next = [...item.ingredients];
+        next[idx].imageUrl = url;
+        setItem({ ...item, ingredients: next });
+      }
+    }
+  };
+
   const addIngredient = () => {
     const newIngredient: Ingredient = { imageUrl: '', name: '', quantity: 1 };
     setItem({ ...item, ingredients: [...item.ingredients, newIngredient] });
@@ -34,6 +80,7 @@ export default function AdminForm({ onSave, onConfirmEdit, onCancelEdit, editing
 
   const handleAction = () => {
     if (!item.name) return alert('아이템 이름을 입력하세요.');
+    if (isUploading) return alert('이미지 업로드 중입니다. 잠시만 기다려주세요.');
     
     if (editingItem) {
       onConfirmEdit({ ...item, id: editingItem.id });
@@ -55,7 +102,13 @@ export default function AdminForm({ onSave, onConfirmEdit, onCancelEdit, editing
         <input type="number" placeholder="가격 (만 단위)" className="p-2 border rounded text-sm" value={item.price || ''} onChange={e => setItem({...item, price: Number(e.target.value)})} />
       </div>
       
-      <input type="text" placeholder="제품 이미지 URL" className="w-full p-2 border rounded text-sm" value={item.imageUrl} onChange={e => setItem({...item, imageUrl: e.target.value})} />
+      <div className="space-y-1">
+        <label className="text-[10px] text-slate-400 block">제품 이미지 업로드</label>
+        <div className="flex gap-2 items-center">
+          <input type="file" accept="image/*" onChange={handleMainImageChange} className="text-xs file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+          {item.imageUrl && <img src={item.imageUrl} alt="preview" className="w-8 h-8 object-contain border rounded" />}
+        </div>
+      </div>
       
       <div className="flex items-center gap-2">
         <label className="text-xs text-slate-500">제작 수량:</label>
@@ -64,16 +117,17 @@ export default function AdminForm({ onSave, onConfirmEdit, onCancelEdit, editing
       
       <div className="border-t pt-4">
         <div className="flex justify-between items-center mb-3">
-          <span className="text-xs font-bold text-slate-600">재료 정보 (이미지 포함)</span>
+          <span className="text-xs font-bold text-slate-600">재료 정보 (직접 업로드)</span>
           <button onClick={addIngredient} className="text-[10px] bg-slate-100 px-2 py-1 rounded hover:bg-slate-200 transition-colors">재료 추가</button>
         </div>
         
         <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
           {item.ingredients.map((ing, idx) => (
             <div key={idx} className="p-3 bg-slate-50 rounded-lg border border-slate-100 space-y-2">
-              <input type="text" placeholder="재료 이미지 URL" className="w-full p-1.5 border rounded text-[10px]" value={ing.imageUrl} onChange={e => {
-                const next = [...item.ingredients]; next[idx].imageUrl = e.target.value; setItem({...item, ingredients: next});
-              }} />
+              <div className="flex items-center gap-2">
+                <input type="file" accept="image/*" onChange={(e) => handleIngredientImageChange(idx, e)} className="text-[8px] flex-1" />
+                {ing.imageUrl && <img src={ing.imageUrl} alt="ing-preview" className="w-6 h-6 object-contain" />}
+              </div>
               <div className="flex gap-2">
                 <input type="text" placeholder="재료명" className="flex-1 p-1.5 border rounded text-[10px]" value={ing.name} onChange={e => {
                   const next = [...item.ingredients]; next[idx].name = e.target.value; setItem({...item, ingredients: next});
@@ -91,10 +145,10 @@ export default function AdminForm({ onSave, onConfirmEdit, onCancelEdit, editing
         {editingItem ? (
           <>
             <button onClick={onCancelEdit} className="flex-1 py-3 bg-slate-200 text-slate-700 rounded-xl font-bold text-sm">취소</button>
-            <button onClick={handleAction} className="flex-1 py-3 bg-amber-500 text-white rounded-xl font-bold text-sm">수정 확정</button>
+            <button onClick={handleAction} disabled={isUploading} className="flex-1 py-3 bg-amber-500 text-white rounded-xl font-bold text-sm disabled:bg-slate-300">수정 확정</button>
           </>
         ) : (
-          <button onClick={handleAction} className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold text-sm">임시 저장 리스트 추가</button>
+          <button onClick={handleAction} disabled={isUploading} className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold text-sm disabled:bg-slate-300">임시 저장 리스트 추가</button>
         )}
       </div>
     </div>

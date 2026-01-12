@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { CraftItem, Ingredient, Database, supabase } from '@/utils/mapleUtils';
+import React, { useState } from 'react';
+import { CraftItem, Database, supabase } from '@/utils/mapleUtils';
 import AdminForm from './AdminForm';
 
 interface Props {
@@ -15,16 +15,21 @@ export default function AdminMode({ initialData, onComplete }: Props) {
   const [editingItem, setEditingItem] = useState<CraftItem | null>(null);
 
   const handleSaveToWaitlist = (newItem: CraftItem) => {
+    // 1. 아이템 목록 업데이트
     if (editingItem) {
       setTempItems(tempItems.map(i => i.id === editingItem.id ? newItem : i));
     } else {
       setTempItems([...tempItems, newItem]);
     }
     
+    // 2. 재료 목록 업데이트 (이미지 주소 동기화 및 필수 price 값 0으로 설정)
     const newMats = [...tempMaterials];
     newItem.ingredients.forEach(ing => {
-      if (!newMats.find(m => m.name === ing.name)) {
-        newMats.push({ name: ing.name, imageUrl: ing.imageUrl });
+      const existing = newMats.find(m => m.name === ing.name);
+      if (!existing) {
+        newMats.push({ name: ing.name, imageUrl: ing.imageUrl, price: 0 });
+      } else {
+        existing.imageUrl = ing.imageUrl;
       }
     });
     setTempMaterials(newMats);
@@ -32,7 +37,7 @@ export default function AdminMode({ initialData, onComplete }: Props) {
   };
 
   const handleFinalSave = async () => {
-    // 1. 아이템 업로드
+    // 1. 아이템 데이터 업로드
     const { error: itemError } = await supabase
       .from('maple_items')
       .upsert(tempItems.map(item => ({
@@ -44,17 +49,20 @@ export default function AdminMode({ initialData, onComplete }: Props) {
         ingredients: item.ingredients
       })));
 
-    // 2. 재료 업로드
+    // 2. 재료 데이터 업로드 (price 필드 포함)
     const { error: matError } = await supabase
       .from('maple_materials')
       .upsert(tempMaterials.map(mat => ({
         name: mat.name,
-        image_url: mat.imageUrl
+        image_url: mat.imageUrl,
+        price: mat.price || 0 
       })));
 
+    // 3. 결과 처리
     if (itemError || matError) {
       alert('데이터베이스 저장 중 오류가 발생했습니다.');
-      console.error(itemError, matError);
+      console.error('Item Error:', itemError);
+      console.error('Material Error:', matError);
     } else {
       alert('Supabase 클라우드 DB에 성공적으로 저장되었습니다.');
       onComplete();
