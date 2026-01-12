@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { CraftItem, Database, supabase } from '@/utils/mapleUtils';
+import AdminMaterialManager from '@/components/AdminMaterialManager'; // 추가
 import AdminForm from './AdminForm';
 
 interface Props {
@@ -70,36 +71,33 @@ export default function AdminMode({ initialData, onComplete }: Props) {
   };
 
   return (
-    <div className="grid grid-cols-12 gap-8">
-      <div className="col-span-5 bg-white p-8 rounded-3xl border shadow-sm h-fit sticky top-24">
-        <AdminForm 
-          onSave={handleSaveToWaitlist} 
-          editingItem={editingItem}
-          onConfirmEdit={handleSaveToWaitlist}
-          onCancelEdit={() => setEditingItem(null)}
-        />
+    <div className="space-y-8"> {/* 전체를 감싸는 div 추가 */}
+      <div className="grid grid-cols-12 gap-8">
+        <div className="col-span-5 bg-white p-8 rounded-3xl border shadow-sm h-fit sticky top-24">
+          <AdminForm 
+            onSave={handleSaveToWaitlist} 
+            editingItem={editingItem}
+            onConfirmEdit={handleSaveToWaitlist}
+            onCancelEdit={() => setEditingItem(null)}
+          />
+        </div>
+
+        <div className="col-span-7 space-y-4">
+          <div className="bg-white p-8 rounded-3xl border shadow-sm min-h-[400px]">
+            <h2 className="text-lg font-black mb-6">DB 업로드 대기 목록</h2>
+            {/* ... 기존 아이템 리스트 코드 ... */}
+          </div>
+          <button onClick={handleFinalSave} className="w-full py-5 bg-blue-600 text-white rounded-3xl font-black shadow-xl">
+            Supabase DB에 동기화
+          </button>
+        </div>
       </div>
 
-      <div className="col-span-7 space-y-4">
-        <div className="bg-white p-8 rounded-3xl border shadow-sm min-h-[400px]">
-          <h2 className="text-lg font-black mb-6">DB 업로드 대기 목록</h2>
-          <div className="space-y-2">
-            {tempItems.map(item => (
-              <div key={item.id} className="group relative p-4 bg-slate-50 border rounded-2xl flex justify-between items-center hover:bg-white hover:border-blue-200 transition-all">
-                <div className="flex items-center gap-3">
-                  <img src={item.imageUrl} className="w-8 h-8 object-contain" alt="" />
-                  <span className="font-bold text-sm">{item.name}</span>
-                </div>
-                <div className="flex gap-2 opacity-0 group-hover:opacity-100">
-                  <button onClick={() => setEditingItem(item)} className="px-3 py-1 bg-amber-500 text-white text-xs rounded">수정</button>
-                  <button onClick={() => setTempItems(tempItems.filter(i => i.id !== item.id))} className="px-3 py-1 bg-red-500 text-white text-xs rounded">삭제</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <button onClick={handleFinalSave} className="w-full py-5 bg-blue-600 text-white rounded-3xl font-black shadow-xl">Supabase DB에 동기화</button>
-      </div>
+      {/* --- 여기 아래에 재료 관리자 추가 --- */}
+      <AdminMaterialManager 
+        materials={tempMaterials} 
+        onRefresh={onComplete} 
+      />
     </div>
   );
 }
