@@ -1,7 +1,7 @@
 // src/components/AdminMaterialManager.tsx
 import React, { useState } from 'react';
 import { supabase } from '@/utils/mapleUtils';
-import { RefreshCw, Upload, Save, Trash2 } from 'lucide-react';
+import { RefreshCw, Upload, Trash2 } from 'lucide-react';
 
 interface Material {
   name: string;
@@ -11,19 +11,18 @@ interface Material {
 
 interface Props {
   materials: Material[];
-  onRefresh: () => void;
+  onUpdate: (updatedMaterials: Material[]) => void; // 상태 업데이트용 함수
 }
 
-export default function AdminMaterialManager({ materials, onRefresh }: Props) {
+export default function AdminMaterialManager({ materials, onUpdate }: Props) {
   const [isUploading, setIsUploading] = useState<string | null>(null);
 
-  // 이미지 업로드 로직 (기존과 동일)
   const handleImageUpdate = async (name: string, file: File) => {
     try {
       setIsUploading(name);
       const fileExt = file.name.split('.').pop();
       const fileName = `mat_${Date.now()}.${fileExt}`;
-      const filePath = `materials/${fileName}`;
+      const filePath = `uploads/${fileName}`; // 폴더를 최초 등록과 같은 uploads로 통일
 
       const { error: uploadError } = await supabase.storage
         .from('maple-storage')
@@ -35,15 +34,13 @@ export default function AdminMaterialManager({ materials, onRefresh }: Props) {
         .from('maple-storage')
         .getPublicUrl(filePath);
 
-      // DB 즉시 업데이트
-      const { error: dbError } = await supabase
-        .from('maple_materials')
-        .update({ image_url: data.publicUrl })
-        .eq('name', name);
-
-      if (dbError) throw dbError;
+      // DB를 직접 수정하는 대신, 부모의 tempMaterials 상태만 업데이트합니다.
+      const nextMaterials = materials.map(m => 
+        m.name === name ? { ...m, imageUrl: data.publicUrl } : m
+      );
       
-      onRefresh(); // 부모 데이터 새로고침
+      onUpdate(nextMaterials);
+      alert('이미지가 임시 반영되었습니다. 하단의 동기화 버튼을 눌러야 최종 저장됩니다.');
     } catch (error: any) {
       alert(`업로드 실패: ${error.message}`);
     } finally {
@@ -51,24 +48,17 @@ export default function AdminMaterialManager({ materials, onRefresh }: Props) {
     }
   };
 
-  // 재료 삭제 로직
-  const handleDelete = async (name: string) => {
-    if (!confirm(`'${name}' 재료를 완전히 삭제하시겠습니까?`)) return;
-    const { error } = await supabase.from('maple_materials').delete().eq('name', name);
-    if (error) alert('삭제 실패');
-    else onRefresh();
+  const handleDelete = (name: string) => {
+    if (!confirm(`'${name}' 재료를 대기 목록에서 삭제하시겠습니까?`)) return;
+    const nextMaterials = materials.filter(m => m.name !== name);
+    onUpdate(nextMaterials);
   };
 
   return (
     <div className="mt-12 bg-white p-8 rounded-3xl border shadow-sm">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-          <h2 className="text-xl font-black text-slate-800">재료 마스터 관리</h2>
-          <p className="text-xs text-slate-400 mt-1">등록된 모든 재료의 이름과 이미지를 관리합니다.</p>
-        </div>
-        <button onClick={onRefresh} className="p-2 hover:bg-slate-50 rounded-full transition-colors">
-          <RefreshCw className="w-5 h-5 text-slate-400" />
-        </button>
+      <div className="mb-8">
+        <h2 className="text-xl font-black text-slate-800">재료 마스터 관리</h2>
+        <p className="text-xs text-slate-400 mt-1">이곳에서 수정 후 하단의 [Supabase DB에 동기화]를 눌러주세요.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

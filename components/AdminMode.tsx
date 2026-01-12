@@ -71,7 +71,7 @@ export default function AdminMode({ initialData, onComplete }: Props) {
   };
 
   return (
-    <div className="space-y-8"> {/* 전체를 감싸는 div 추가 */}
+    <div className="space-y-8">
       <div className="grid grid-cols-12 gap-8">
         <div className="col-span-5 bg-white p-8 rounded-3xl border shadow-sm h-fit sticky top-24">
           <AdminForm 
@@ -85,18 +85,20 @@ export default function AdminMode({ initialData, onComplete }: Props) {
         <div className="col-span-7 space-y-4">
           <div className="bg-white p-8 rounded-3xl border shadow-sm min-h-[400px]">
             <h2 className="text-lg font-black mb-6">DB 업로드 대기 목록</h2>
-            {/* ... 기존 아이템 리스트 코드 ... */}
+            {/* 기존 아이템 목록 표시 로직 */}
           </div>
+          
+          {/* 이 버튼이 클릭되면 아이템과 재료(수정된 이미지 포함)가 한꺼번에 DB로 갑니다 */}
           <button onClick={handleFinalSave} className="w-full py-5 bg-blue-600 text-white rounded-3xl font-black shadow-xl">
             Supabase DB에 동기화
           </button>
         </div>
       </div>
 
-      {/* --- 여기 아래에 재료 관리자 추가 --- */}
+      {/* 재료 관리자에게 tempMaterials와 이를 수정할 수 있는 setTempMaterials를 넘깁니다 */}
       <AdminMaterialManager 
         materials={tempMaterials} 
-        onRefresh={onComplete} 
+        onUpdate={(updated) => setTempMaterials(updated)} 
       />
     </div>
   );
